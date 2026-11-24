@@ -3,13 +3,36 @@
 ダークファンタジーのドット絵タワーディフェンス。Godot 4 で作った個人用のゲームです。
 冥王ザルヴァスの亡者軍を率いて、白銀教団の砦を落とします。キャラクター・名称・ドット絵はすべてオリジナルです。
 
-## 遊び方
+## 遊び方（すぐ起動する）
 
-1. [Godot 4.3 以降](https://godotengine.org/download/) をインストール
-2. Godot のプロジェクトマネージャーで「インポート」→ このフォルダの `project.godot` を選択
-3. F5（再生ボタン）で起動
+### Windows
 
-進行状況は `user://necrothrone_save.json` に保存されます。
+1. [Godot 4.3 以降](https://godotengine.org/download/windows/) の通常版（.NET版ではない方）のzipをダウンロード
+2. zipをこのフォルダの `tools` フォルダに展開する（または「ダウンロード」フォルダに置いたままでもOK）
+3. `run_game.bat` をダブルクリック
+
+`run_game.bat` はGodotを自動で探します（`tools`、ダウンロード、デスクトップ、Program Files、PATH、scoop、Steam）。見つからないときはダウンロードページを開き、exeのパスを聞いてきます。一度見つけたパスは `.godot_path` に保存されます。ログやエラーはこの黒いウィンドウに表示されます。
+
+| コマンド | 内容 |
+|---|---|
+| `run_game.bat` | 通常起動 |
+| `run_game.bat 10` | デバッグモードで、いきなりステージ10のバトルから開始 |
+| `run_game.bat debug` | デバッグモードで起動（拠点から） |
+| `run_game.bat edit` | Godotエディタでプロジェクトを開く |
+
+### macOS / Linux
+
+`./run_game.sh`（引数は `.bat` と同じ）。Godotは `$GODOT`、PATHの `godot`、`/Applications/Godot.app` の順で探します。
+
+## デバッグ機能
+
+デバッグモード（`run_game.bat 10` / `debug`、またはGodotエディタからF5で実行）では：
+
+- **F1** でデバッグパネルを開閉：魂貨・冥核の付与、全カード入手・Lv上げ、パッシブ全開放／リセット、任意ステージへ出撃、バトル中の即勝利・即敗北・魂力満タン・待ち時間0・裁きチャージ・×4速
+- 通常とは**別のセーブ**（`user://necrothrone_save_debug.json`）を使うので、普段のデータは壊れません
+- 起動オプション（Godotに直接渡す場合は `--` の後ろに書く）：`--debug`、`--stage=N`、`--fresh`（デバッグ用セーブを初期化）
+
+例：`Godot_v4.3-stable_win64_console.exe --path . -- --stage=5 --fresh`
 
 ## 構成
 
@@ -21,6 +44,8 @@
 | `scripts/game.gd` | セーブデータと各種計算式、UIテーマ |
 | `scripts/hub.gd` | 拠点画面（カード編成・強化・転生） |
 | `scripts/battle.gd` | タワーディフェンスのバトル |
+| `scripts/debug_panel.gd` | デバッグパネル（F1） |
+| `run_game.bat` / `run_game.sh` | Godotを探してゲームを起動するスクリプト |
 
 ## ゲームの流れ
 

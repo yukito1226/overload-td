@@ -25,6 +25,17 @@ func _ready() -> void:
 	add_child(modal_layer)
 
 	hub.refresh()
+	if G.debug:
+		var dbg := preload("res://scripts/debug_panel.gd").new()
+		dbg.main = self
+		add_child(dbg)
+	if G.boot_stage > 0:
+		# デバッグ起動：説明を飛ばしてすぐ指定ステージへ
+		G.S["intro"] = true
+		G.S["max_stage"] = max(G.S["max_stage"], G.boot_stage)
+		G.S["stage"] = G.boot_stage
+		start_battle.call_deferred(G.boot_stage)
+		return
 	if not G.S.get("intro", false):
 		G.S["intro"] = true
 		G.save_game()

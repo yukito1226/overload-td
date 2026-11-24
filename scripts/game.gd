@@ -1,7 +1,16 @@
 extends Node
 ## 進行状況（セーブ）と各種計算式
 
-const SAVE_PATH := "user://necrothrone_save.json"
+const SAVE_PATH_NORMAL := "user://necrothrone_save.json"
+const SAVE_PATH_DEBUG := "user://necrothrone_save_debug.json"
+
+## 起動オプション（`godot --path . -- --debug --stage=10` のように -- の後ろに書く）
+##   --debug     デバッグパネル（F1）を有効化し、通常とは別のセーブを使う
+##   --stage=N   起動したらすぐステージNのバトルを始める（--debug も自動で有効）
+##   --fresh     デバッグ用セーブを初期化して始める
+var debug := false
+var boot_stage := 0
+var SAVE_PATH := SAVE_PATH_NORMAL
 
 const C_BG := Color("#0d0a12")
 const C_PANEL := Color("#1a1422")
@@ -20,7 +29,23 @@ func _ready() -> void:
 	var f := SystemFont.new()
 	f.font_names = PackedStringArray(["Yu Gothic UI", "Yu Gothic", "Meiryo", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", "Noto Sans JP", "sans-serif"])
 	font = f
+	_parse_args()
+	if debug and "--fresh" in OS.get_cmdline_user_args() and FileAccess.file_exists(SAVE_PATH):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
 	load_game()
+
+func _parse_args() -> void:
+	for a in OS.get_cmdline_user_args():
+		if a == "--debug":
+			debug = true
+		elif a.begins_with("--stage="):
+			boot_stage = max(1, int(a.get_slice("=", 1)))
+			debug = true
+	# エディタから実行したとき（エクスポート版でないとき）もデバッグパネルを使える
+	if OS.has_feature("editor"):
+		debug = true
+	if debug:
+		SAVE_PATH = SAVE_PATH_DEBUG
 
 # ---------------- セーブ ----------------
 func fresh_run(s: Dictionary) -> void:
