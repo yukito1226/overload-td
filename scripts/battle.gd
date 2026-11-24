@@ -27,6 +27,7 @@ class Unit:
 	var walk: float
 	var dead := false
 	var hit := 0.0
+	var saved := false
 
 var main
 var stage := 1
@@ -56,6 +57,10 @@ var shake := 0.0
 var flash := 0.0
 var banner := {}
 var speed := 1
+var legion_t := 0.0
+var cannon_t := 1.0
+var bolts: Array = []
+var core_gain := 0
 
 var bg_tex: ImageTexture
 var font: Font
@@ -71,7 +76,8 @@ func _ready() -> void:
 	mana = min(G.max_mana(), 60.0 * G.T("start"))
 	castle = {"x": CASTLE_X, "hp": float(G.castle_hp()), "max": float(G.castle_hp())}
 	ebase = {"x": EBASE_X, "hp": float(G.ebase_hp(stage)), "max": float(G.ebase_hp(stage))}
-	spell_max = 30.0 * pow(0.8, G.relic_n("bell"))
+	spell_max = 30.0 * pow(0.8, G.relic_n("bell")) * pow(0.85, G.T("chant"))
+	legion_t = _legion_interval()
 	for id in G.S["deck"]:
 		cds[id] = 0.0
 	bg_tex = _make_bg()
@@ -217,6 +223,10 @@ func _damage(u: Unit, dmg: float) -> void:
 		return
 	u.hp -= dmg
 	u.hit = 0.12
+	if u.hp <= 0 and u.side > 0 and G.T("undying") > 0 and not u.saved:
+		u.saved = true
+		u.hp = 1
+		nums.append({"x": u.x, "y": GROUND - u.h - 18, "v": "執念", "t": 0.9, "c": G.C_ACCENT})
 	nums.append({"x": u.x, "y": GROUND - u.h - 6, "v": str(roundi(dmg)), "t": 0.7, "c": Color("#ff8a8a") if u.side > 0 else Color("#ffe080")})
 	var kb_n: int = u.d.get("kb", 1)
 	var seg := int(floor((1.0 - max(0.0, u.hp) / u.mx) * kb_n))
@@ -234,6 +244,8 @@ func _damage(u: Unit, dmg: float) -> void:
 
 func _hit_base(side: int, dmg: float) -> void:
 	var b: Dictionary = ebase if side > 0 else castle
+	if side < 0:
+		dmg *= pow(0.9, G.T("fortress"))
 	b["hp"] -= dmg
 	shake = 0.15
 	nums.append({"x": b["x"] + (-20 if side > 0 else 20), "y": GROUND - 160, "v": str(roundi(dmg)), "t": 0.7, "c": Color("#ffe080") if side > 0 else Color("#ff8a8a")})
@@ -247,6 +259,7 @@ func _apply_hit(u: Unit, tx: float, dmg: float, aoe: float) -> void:
 		for f in _foes(u):
 			if abs(f.x - tx) <= aoe:
 				_damage(f, dmg)
+				_drain(u, dmg)
 		if abs(base_x - tx) <= aoe + 30:
 			_hit_base(u.side, dmg)
 		var col: Color = u.d.get("proj", Color("#ff8a20"))
@@ -262,10 +275,18 @@ func _apply_hit(u: Unit, tx: float, dmg: float, aoe: float) -> void:
 				best = f
 		if best:
 			_damage(best, dmg)
+			_drain(u, dmg)
 		elif abs(base_x - tx) < 50:
 			_hit_base(u.side, dmg)
 
+func _drain(u: Unit, dmg: float) -> void:
+	var lv := G.T("drain")
+	if u.side > 0 and lv > 0 and not u.dead:
+		u.hp = min(u.mx, u.hp + dmg * 0.1 * lv)
+
 func _step_unit(u: Unit, dt: float) -> void:
+	if u.side > 0 and G.T("regen") > 0:
+		u.hp = min(u.mx, u.hp + u.mx * 0.015 * G.T("regen") * dt)
 	if u.kb > 0:
 		u.kb -= dt
 		u.x = clamp(u.x - u.side * 110 * dt, CASTLE_X + 10, EBASE_X - 10)
@@ -313,7 +334,10 @@ func _step_unit(u: Unit, dt: float) -> void:
 			else:
 				_apply_hit(u, target_x, u.atk, float(d.get("aoe", 0)))
 	else:
-		u.x += u.side * u.spd * dt
+		var slow := 1.0
+		if u.side < 0 and G.T("miasma") > 0 and u.x < CASTLE_X + 260:
+			slow = max(0.25, 1.0 - 0.2 * G.T("miasma"))
+		u.x += u.side * u.spd * dt * slow
 		u.walk += dt * u.spd * 0.25
 
 func _step_proj(p: Dictionary, dt: float) -> void:
@@ -352,7 +376,7 @@ func _pick_enemy() -> String:
 
 func _spawn_enemy(key: String) -> void:
 	var e: Dictionary = Data.ENEMIES[key]
-	_add_unit(-1, e, roundi(e["hp"] * sc["hp"]), roundi(e["atk"] * sc["atk"]), e["spd"], EBASE_X - 30)
+	_add_unit(-1, e, roundi(e["hp"] * sc["hp"]), roundi(e["atk"] * sc["atk"] * (1.0 - 0.07 * G.T("hex"))), e["spd"], EBASE_X - 30)
 
 func _enemy_ai(dt: float) -> void:
 	spawn_t -= dt
@@ -383,9 +407,41 @@ func cast_spell() -> void:
 	for f in units.filter(func(u): return u.side < 0 and not u.dead):
 		pillars.append({"x": f.x, "t": 0.6})
 		_damage(f, dmg)
+		if G.T("doom") > 0:
+			f.kb = 0.6
+	if G.T("doom") > 0:
+		pillars.append({"x": EBASE_X - 30, "t": 0.6})
+		_hit_base(1, dmg)
 	flash = 0.4
 	shake = 0.3
 	banner = {"t": 1.5, "txt": "冥王の裁き"}
+
+func _legion_interval() -> float:
+	return [0.0, 14.0, 10.0, 7.0][G.T("legion")]
+
+## 死者の行進・玉座の呪砲
+func _passive_tick(dt: float) -> void:
+	if G.T("legion") > 0:
+		legion_t -= dt
+		if legion_t <= 0:
+			legion_t = _legion_interval()
+			var st := G.unit_stats("skel")
+			_add_unit(1, Data.CARDS["skel"], st["hp"], st["atk"], st["spd"], CASTLE_X + 30)
+	var cl := G.T("cannon")
+	if cl > 0:
+		cannon_t -= dt
+		if cannon_t <= 0:
+			var tgt: Unit = null
+			for u in units:
+				if u.side < 0 and not u.dead and u.x < CASTLE_X + 320 and (tgt == null or u.x < tgt.x):
+					tgt = u
+			if tgt:
+				cannon_t = 1.6
+				var dmg := 22.0 * cl * (1.0 + 0.25 * (stage - 1))
+				_damage(tgt, dmg)
+				bolts.append({"a": Vector2(CASTLE_X, GROUND - 195), "b": Vector2(tgt.x, GROUND - tgt.h / 2), "t": 0.25})
+			else:
+				cannon_t = 0.2
 
 # ---------------- ループ ----------------
 func _process(delta: float) -> void:
@@ -400,6 +456,7 @@ func _process(delta: float) -> void:
 			for id in cds:
 				cds[id] = max(0.0, cds[id] - sdt)
 			_enemy_ai(sdt)
+			_passive_tick(sdt)
 			for u in units:
 				if not u.dead:
 					_step_unit(u, sdt)
@@ -422,6 +479,9 @@ func _process(delta: float) -> void:
 		n["t"] -= dt
 		n["y"] -= 30 * dt
 	nums = nums.filter(func(n): return n["t"] > 0)
+	for bo in bolts:
+		bo["t"] -= dt
+	bolts = bolts.filter(func(b): return b["t"] > 0)
 	for p in pillars:
 		p["t"] -= dt
 	pillars = pillars.filter(func(p): return p["t"] > 0)
@@ -471,6 +531,10 @@ func _draw() -> void:
 		var s := 6.0 if p["big"] else 4.0
 		_px(p["x"] - s / 2, p["y"] - s / 2, s, s, p["c"])
 		_px(p["x"] - s / 2 - p["side"] * 6, p["y"] - s / 2, s, s, Color(p["c"], 0.4))
+	if G.T("miasma") > 0:
+		_px(CASTLE_X, GROUND - 40, 260, 40, Color(0.45, 0.2, 0.6, 0.12 + 0.05 * sin(t * 2)))
+	for bo in bolts:
+		draw_line(bo["a"], bo["b"], Color(G.C_ACCENT, bo["t"] * 4), 3)
 	for pl in pillars:
 		var a: float = min(1.0, pl["t"] * 2)
 		_px(pl["x"] - 12, 0, 24, GROUND, Color(Color("#7a3cc0"), a))
@@ -608,6 +672,8 @@ func end_battle(win: bool) -> void:
 	gain += int(floor(soul_bonus * G.soul_mult()))
 	S["souls"] += gain
 	var first: bool = win and stage == S["max_stage"]
+	core_gain = 2 if first and stage % 5 == 0 else 0
+	S["core"] += core_gain
 	if win:
 		if first:
 			S["max_stage"] += 1
@@ -619,7 +685,11 @@ func end_battle(win: bool) -> void:
 	if win:
 		_show_reward(gain, int(t), first)
 	else:
-		var hint := "\n行き詰まったら「転生」で冥核を得て永続強化しましょう（現在 +%d 冥核）。" % G.rebirth_gain() if G.rebirth_gain() > 0 else "\nカードや玉座を強化して再挑戦しましょう。"
+		var hint := "\nカードや玉座を強化して再挑戦しましょう。"
+		if G.rebirth_gain() > 0:
+			hint = "\n行き詰まったら「転生」で冥核 +%d を得て、パッシブスキルを解放しましょう。" % G.rebirth_gain()
+		elif G.S["core"] > 0:
+			hint = "\n冥核が %d あります。「パッシブスキル」タブで新しい力を解放しましょう。" % G.S["core"]
 		main.open_modal("敗北…", "戦闘時間 %d秒・撃破 %d\n獲得魂貨 +%s%s" % [int(t), kills, G.fmt(gain), hint], [["玉座へ戻る", main.back_to_hub]])
 
 func _show_reward(gain: int, time: int, first: bool) -> void:
@@ -694,7 +764,7 @@ func _show_reward(gain: int, time: int, first: bool) -> void:
 				c.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			v.add_child(c)
 		row.add_child(b)
-	main.open_modal("勝利！", "戦闘時間 %d秒・撃破 %d・獲得魂貨 +%s%s\n戦利品をひとつ選べ：" % [time, kills, G.fmt(gain), "\n新たなステージが開放された。" if first else ""], [], row)
+	main.open_modal("勝利！", "戦闘時間 %d秒・撃破 %d・獲得魂貨 +%s%s\n戦利品をひとつ選べ：" % [time, kills, G.fmt(gain), ("\n新たなステージが開放された。" if first else "") + ("\nボス初撃破！ 冥核 +%d（パッシブスキルの解放に使えます）" % core_gain if core_gain > 0 else "")], [], row)
 
 func _take_reward(o: Dictionary) -> void:
 	var S := G.S

@@ -304,14 +304,29 @@ var UPS := {
 	"wallet": {"name": "墓荒らし", "desc": "獲得魂貨 +10%/Lv",   "base": 60, "g": 1.6},
 }
 
-var TALENTS := {
-	"might":   {"name": "冥王の威光", "desc": "全ユニット攻撃力 +12%/Lv（乗算）"},
-	"flesh":   {"name": "不死の肉体", "desc": "全ユニット体力 +12%/Lv（乗算）"},
-	"harvest": {"name": "魂の収穫",   "desc": "獲得魂貨 +25%/Lv"},
-	"start":   {"name": "冥府の蓄え", "desc": "開始時の魂力 +60/Lv"},
-	"flow":    {"name": "冥河の流れ", "desc": "魂力の回復 +10%/Lv"},
-	"pact":    {"name": "古の盟約",   "desc": "転生後、追加カードを1枚所持して開始/Lv"},
-	"wrath":   {"name": "冥王の怒り", "desc": "冥王の裁きの威力 +30%/Lv"},
+# パッシブスキル（冥核で解放する永続強化。転生しても失われない）
+# branch: 系統, tier: 段階(1〜3), max: 最大Lv, base: 基本コスト（Lv×base 冥核）
+# req: 解放条件 [スキルID, 必要Lv]
+var BRANCHES := [["army", "軍勢の業"], ["throne", "玉座の業"], ["sorcery", "冥術の業"]]
+var PASSIVES := {
+	"might":   {"branch": "army", "tier": 1, "max": 10, "base": 1, "name": "冥王の威光", "desc": "全ユニット攻撃力 +12%/Lv（乗算）"},
+	"flesh":   {"branch": "army", "tier": 1, "max": 10, "base": 1, "name": "不死の肉体", "desc": "全ユニット体力 +12%/Lv（乗算）"},
+	"regen":   {"branch": "army", "tier": 2, "max": 3,  "base": 3, "req": ["flesh", 2], "name": "骨の再生", "desc": "味方ユニットが毎秒 最大体力の1.5%/Lv 回復"},
+	"drain":   {"branch": "army", "tier": 2, "max": 3,  "base": 3, "req": ["might", 2], "name": "魂吸い", "desc": "与えたダメージの10%/Lv 体力を吸収"},
+	"undying": {"branch": "army", "tier": 3, "max": 1,  "base": 8, "req": ["regen", 1], "name": "不死の執念", "desc": "味方は一度だけ致命傷を体力1で耐える"},
+	"legion":  {"branch": "army", "tier": 3, "max": 3,  "base": 6, "req": ["drain", 1], "name": "死者の行進", "desc": "一定時間ごとに骸骨兵を無償で召喚（14/10/7秒）"},
+	"start":   {"branch": "throne", "tier": 1, "max": 5,  "base": 1, "name": "冥府の蓄え", "desc": "開始時の魂力 +60/Lv"},
+	"flow":    {"branch": "throne", "tier": 1, "max": 10, "base": 1, "name": "冥河の流れ", "desc": "魂力の回復 +10%/Lv"},
+	"cannon":  {"branch": "throne", "tier": 2, "max": 5,  "base": 3, "req": ["start", 1], "name": "玉座の呪砲", "desc": "玉座が近づく敵を自動で砲撃（威力 Lvに比例）"},
+	"miasma":  {"branch": "throne", "tier": 2, "max": 3,  "base": 3, "req": ["flow", 2], "name": "瘴気の結界", "desc": "玉座付近の敵の移動速度 -20%/Lv"},
+	"rite":    {"branch": "throne", "tier": 3, "max": 3,  "base": 6, "req": ["miasma", 1], "name": "黒き儀式", "desc": "召喚クールダウン -12%/Lv"},
+	"fortress":{"branch": "throne", "tier": 3, "max": 3,  "base": 6, "req": ["cannon", 2], "name": "骨の城塞", "desc": "玉座の耐久 +40%/Lv、玉座が受けるダメージ -10%/Lv"},
+	"harvest": {"branch": "sorcery", "tier": 1, "max": 10, "base": 1, "name": "魂の収穫", "desc": "獲得魂貨 +25%/Lv"},
+	"wrath":   {"branch": "sorcery", "tier": 1, "max": 5,  "base": 1, "name": "冥王の怒り", "desc": "冥王の裁きの威力 +30%/Lv"},
+	"chant":   {"branch": "sorcery", "tier": 2, "max": 3,  "base": 3, "req": ["wrath", 1], "name": "速唱", "desc": "冥王の裁きのチャージ時間 -15%/Lv"},
+	"hex":     {"branch": "sorcery", "tier": 2, "max": 3,  "base": 3, "req": ["harvest", 1], "name": "弱体の呪詛", "desc": "敵の攻撃力 -7%/Lv"},
+	"doom":    {"branch": "sorcery", "tier": 3, "max": 1,  "base": 8, "req": ["chant", 1], "name": "終焉の刻", "desc": "冥王の裁きが敵を吹き飛ばし、敵の砦にも直撃する"},
+	"pact":    {"branch": "sorcery", "tier": 3, "max": 5,  "base": 6, "req": ["hex", 1], "name": "古の盟約", "desc": "転生後、追加カードを1枚所持して開始/Lv"},
 }
 
 ## スプライトキー -> {"r": 右向き, "l": 左向き}

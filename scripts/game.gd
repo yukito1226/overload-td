@@ -83,6 +83,21 @@ func wipe() -> void:
 func T(k: String) -> int:
 	return int(S["talents"].get(k, 0))
 
+## パッシブの次のLvに必要な冥核（最大Lvなら -1）
+func passive_cost(k: String) -> int:
+	var p: Dictionary = Data.PASSIVES[k]
+	var lv := T(k)
+	if lv >= p["max"]:
+		return -1
+	return int(p["base"]) * (lv + 1)
+
+## 解放条件を満たしているか
+func passive_unlocked(k: String) -> bool:
+	var p: Dictionary = Data.PASSIVES[k]
+	if not p.has("req"):
+		return true
+	return T(p["req"][0]) >= int(p["req"][1])
+
 func relic_n(k: String) -> int:
 	return S["relics"].count(k)
 
@@ -105,7 +120,7 @@ func unit_stats(id: String) -> Dictionary:
 	return {
 		"hp": roundi(c["hp"] * hp_m), "atk": roundi(c["atk"] * atk_m),
 		"spd": c["spd"] * (1.0 + 0.12 * relic_n("march")),
-		"cd": c["cd"] * pow(0.88, relic_n("hourg")),
+		"cd": c["cd"] * pow(0.88, relic_n("hourg")) * pow(0.88, T("rite")),
 	}
 
 func regen_rate() -> float:
@@ -115,7 +130,7 @@ func max_mana() -> int:
 	return 600 + 120 * S["up"]["maxm"]
 
 func castle_hp() -> int:
-	return roundi(1500.0 * (1.0 + 0.2 * S["up"]["castle"]) * (1.0 + 0.25 * relic_n("shield")))
+	return roundi(1500.0 * (1.0 + 0.2 * S["up"]["castle"]) * (1.0 + 0.25 * relic_n("shield")) * (1.0 + 0.4 * T("fortress")))
 
 func enemy_scale(s: int) -> Dictionary:
 	return {"hp": pow(1.13, s - 1), "atk": pow(1.09, s - 1)}
@@ -128,7 +143,7 @@ func win_souls(s: int) -> int:
 
 func rebirth_gain() -> int:
 	var m: int = S["max_stage"]
-	return int(floor(pow(m, 1.6) / 4.0)) if m >= 6 else 0
+	return int(floor(pow(m, 1.6) / 4.0)) if m >= 5 else 0
 
 func fmt(n: float) -> String:
 	if n >= 1e6:
