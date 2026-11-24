@@ -47,7 +47,7 @@ func fresh_run(s: Dictionary) -> void:
 	s["deck"] = deck
 
 func new_save() -> Dictionary:
-	var s := {"core": 0, "talents": {}, "rebirths": 0, "best": 1, "last_idle": Time.get_unix_time_from_system(), "intro": false}
+	var s := {"core": 0, "talents": {}, "rebirths": 0, "best": 1, "intro": false}
 	fresh_run(s)
 	return s
 
@@ -129,14 +129,6 @@ func win_souls(s: int) -> int:
 func rebirth_gain() -> int:
 	var m: int = S["max_stage"]
 	return int(floor(pow(m, 1.6) / 4.0)) if m >= 6 else 0
-
-func idle_rate() -> float:
-	var m: int = S["max_stage"]
-	return 0.5 * m * pow(1.1, m - 1) * soul_mult() * (1.0 + 0.4 * T("idle"))
-
-func idle_pending() -> int:
-	var sec: float = min(8.0 * 3600.0, Time.get_unix_time_from_system() - float(S["last_idle"]))
-	return int(floor(max(0.0, sec) * idle_rate()))
 
 func fmt(n: float) -> String:
 	if n >= 1e6:

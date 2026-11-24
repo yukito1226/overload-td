@@ -310,7 +310,6 @@ var TALENTS := {
 	"harvest": {"name": "魂の収穫",   "desc": "獲得魂貨 +25%/Lv"},
 	"start":   {"name": "冥府の蓄え", "desc": "開始時の魂力 +60/Lv"},
 	"flow":    {"name": "冥河の流れ", "desc": "魂力の回復 +10%/Lv"},
-	"idle":    {"name": "眠らぬ亡者", "desc": "放置収穫 +40%/Lv"},
 	"pact":    {"name": "古の盟約",   "desc": "転生後、追加カードを1枚所持して開始/Lv"},
 	"wrath":   {"name": "冥王の怒り", "desc": "冥王の裁きの威力 +30%/Lv"},
 }

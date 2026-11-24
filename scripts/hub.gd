@@ -3,7 +3,6 @@ extends MarginContainer
 
 var main
 var lbl_res: Label
-var idle_btn: Button
 var go_btn: Button
 var minus_btn: Button
 var plus_btn: Button
@@ -33,8 +32,6 @@ func _ready() -> void:
 	lbl_res = G.label("", 14)
 	lbl_res.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar1.get_child(0).add_child(lbl_res)
-	idle_btn = G.button("放置収穫", _collect_idle, G.C_GOLD)
-	bar1.get_child(0).add_child(idle_btn)
 
 	# 出撃バー
 	var bar2 := _bar()
@@ -61,11 +58,6 @@ func _ready() -> void:
 	up_box = _tab("玉座の強化")
 	reb_box = _tab("転生・冥王の遺志")
 
-	var t := Timer.new()
-	t.wait_time = 1.0
-	t.autostart = true
-	t.timeout.connect(func(): if visible: _refresh_bar())
-	add_child(t)
 
 func _bar() -> PanelContainer:
 	var p := PanelContainer.new()
@@ -99,19 +91,10 @@ func refresh() -> void:
 func _refresh_bar() -> void:
 	var S := G.S
 	lbl_res.text = "魂貨 %s　　冥核 %s　　ステージ %d（今周の最高 %d ／ 歴代 %d）" % [G.fmt(S["souls"]), G.fmt(S["core"]), S["stage"], S["max_stage"], S["best"]]
-	idle_btn.text = "放置収穫 +" + G.fmt(G.idle_pending())
 	go_btn.text = "出撃：ステージ %d%s" % [S["stage"], "（ボス）" if S["stage"] % 5 == 0 else ""]
 	minus_btn.disabled = S["stage"] <= 1
 	plus_btn.disabled = S["stage"] >= S["max_stage"]
 	stage_info.text = "勝利報酬 約%s魂貨%s" % [G.fmt(G.win_souls(S["stage"])), "（周回）" if S["stage"] < S["max_stage"] else ""]
-
-func _collect_idle() -> void:
-	var g := G.idle_pending()
-	G.S["souls"] += g
-	G.S["last_idle"] = Time.get_unix_time_from_system()
-	G.save_game()
-	refresh()
-	main.toast("放置収穫 +%s 魂貨" % G.fmt(g))
 
 func _go() -> void:
 	if G.S["deck"].is_empty():
@@ -267,7 +250,6 @@ func _rebirth() -> void:
 		G.S["core"] += g
 		G.S["rebirths"] += 1
 		G.fresh_run(G.S)
-		G.S["last_idle"] = Time.get_unix_time_from_system()
 		G.save_game()
 		refresh()
 		main.toast("転生した。冥核 +%d" % g))
