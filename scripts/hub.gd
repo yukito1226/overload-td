@@ -11,6 +11,7 @@ var tabs: TabContainer
 var deck_box: VBoxContainer
 var up_box: VBoxContainer
 var reb_box: VBoxContainer
+var relic_box: VBoxContainer
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -56,6 +57,7 @@ func _ready() -> void:
 	root.add_child(tabs)
 	deck_box = _tab("軍勢（カード）")
 	up_box = _tab("玉座の強化")
+	relic_box = _tab("遺物")
 	reb_box = _tab("転生・パッシブスキル")
 
 
@@ -86,11 +88,12 @@ func refresh() -> void:
 	_refresh_bar()
 	_build_deck()
 	_build_up()
+	_build_relics()
 	_build_reb()
 
 func _refresh_bar() -> void:
 	var S := G.S
-	lbl_res.text = "魂貨 %s　　冥核 %s　　ステージ %d（今周の最高 %d ／ 歴代 %d）" % [G.fmt(S["souls"]), G.fmt(S["core"]), S["stage"], S["max_stage"], S["best"]]
+	lbl_res.text = "魂貨 %s　　欠片 %s　　冥核 %s　　ステージ %d（今周の最高 %d ／ 歴代 %d）" % [G.fmt(S["souls"]), G.fmt(S["shards"]), G.fmt(S["core"]), S["stage"], S["max_stage"], S["best"]]
 	go_btn.text = "出撃：ステージ %d%s" % [S["stage"], "（ボス）" if S["stage"] % 5 == 0 else ""]
 	minus_btn.disabled = S["stage"] <= 1
 	plus_btn.disabled = S["stage"] >= S["max_stage"]
@@ -113,13 +116,6 @@ func _build_deck() -> void:
 	deck_box.add_child(grid)
 	for id in Data.CARDS:
 		grid.add_child(_card_widget(id))
-	if S["relics"].size() > 0:
-		var names := []
-		for r in S["relics"]:
-			names.append(Data.RELICS[r]["name"])
-		var l := G.label("所持遺物（転生でリセット）： " + "、".join(names), 12, G.C_GOLD)
-		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		deck_box.add_child(l)
 
 func _card_widget(id: String) -> Control:
 	var S := G.S
@@ -152,7 +148,7 @@ func _card_widget(id: String) -> Control:
 	var cl := G.label("魂力%d　再召喚%.1fs" % [c["cost"], st["cd"]] + ("（魂の器が不足）" if c["cost"] > G.max_mana() else ""), 11, cost_col)
 	cl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(cl)
-	var sl := G.label("体力%d 攻撃%d%s\n%s" % [st["hp"], st["atk"], " 範囲" if c.has("aoe") else "", c["desc"]], 11, G.C_DIM)
+	var sl := G.label("体力%s 攻撃%s%s\n%s" % [G.fmt(st["hp"]), G.fmt(st["atk"]), " 範囲" if c.has("aoe") else "", c["desc"]], 11, G.C_DIM)
 	sl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(sl)
 	var h := HBoxContainer.new()
@@ -214,7 +210,7 @@ func _build_up() -> void:
 		var b := G.button(G.fmt(cost) + " 魂貨", func(): _buy_up(k), G.C_GOLD)
 		b.disabled = G.S["souls"] < cost
 		up_box.add_child(_row("%s  Lv%d" % [u["name"], G.S["up"][k]], u["desc"], b))
-	up_box.add_child(G.label("現在：魂力回復 %d/秒・上限 %d・玉座耐久 %d・魂貨倍率 ×%.2f" % [G.regen_rate(), G.max_mana(), G.castle_hp(), G.soul_mult()], 12, G.C_DIM))
+	up_box.add_child(G.label("現在：魂力回復 %d/秒・上限 %d・玉座耐久 %s・魂貨倍率 ×%s" % [G.regen_rate(), G.max_mana(), G.fmt(G.castle_hp()), G.fmt_mult(G.soul_mult())], 12, G.C_DIM))
 
 func _buy_up(k: String) -> void:
 	var cost := G.up_cost(k)
@@ -231,7 +227,7 @@ func _build_reb() -> void:
 	var rb := G.button("転生 +%d 冥核" % g, _rebirth, G.C_ACCENT)
 	rb.disabled = g <= 0
 	reb_box.add_child(_row("転生の儀",
-		"魂貨・ステージ・カード・強化・遺物をすべて失い、冥核を得て最初からやり直します。今周の最高ステージが高いほど多く得られます（ステージ5到達で解放）。ボスの初撃破でも冥核+2。転生回数：%d" % G.S["rebirths"],
+		"魂貨・ステージ・カード・玉座の強化を失い、冥核を得て最初からやり直します（遺物と欠片は残ります）。今周の最高ステージが高いほど多く得られます（ステージ5到達で解放）。ボスの初撃破でも冥核+2。転生回数：%d" % G.S["rebirths"],
 		rb, G.C_ACCENT))
 	reb_box.add_child(G.label("パッシブスキル：冥核で解放する永続の力（転生しても失われません）。前のスキルを育てると次の段階が解放されます。　所持冥核 %d" % G.S["core"], 12, G.C_DIM))
 	var cols := HBoxContainer.new()
@@ -290,9 +286,79 @@ func _passive_node(k: String) -> Control:
 	v.add_child(b)
 	return panel
 
+func _build_relics() -> void:
+	_clear(relic_box)
+	var S := G.S
+	var top := HBoxContainer.new()
+	relic_box.add_child(top)
+	var info := G.label("遺物の欠片 %s　　発見 %d/%d　　攻撃倍率 ×%s　体力倍率 ×%s" % [G.fmt(S["shards"]), G.relic_count(), Data.RELICS.size(), G.fmt_mult(G.atk_mult()), G.fmt_mult(G.hp_mult())], 13, G.C_GOLD)
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(info)
+	top.add_child(G.button("まとめて強化（安い順）", func():
+		var n := G.relic_up_all()
+		G.save_game()
+		refresh()
+		main.toast("遺物を %d 回強化した" % n if n > 0 else "欠片が足りません"), G.C_GOLD))
+	var note := G.label("遺物は転生しても失われません。欠片はバトルで手に入り、ステージが進むほど多くなります。新しい遺物はボスの初撃破と戦利品で見つかります。「×」の遺物はLvごとに効果が掛け算で伸びます。", 12, G.C_DIM)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	relic_box.add_child(note)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 6)
+	relic_box.add_child(grid)
+	for rar in range(2, -1, -1):
+		for k in Data.RELICS:
+			if Data.RELICS[k]["rarity"] == rar:
+				grid.add_child(_relic_widget(k))
+
+func _relic_widget(k: String) -> Control:
+	var r: Dictionary = Data.RELICS[k]
+	var rar: Dictionary = Data.RARITY[r["rarity"]]
+	var lv := G.rl(k)
+	var p := PanelContainer.new()
+	p.custom_minimum_size.x = 452
+	p.add_theme_stylebox_override("panel", G.sb(G.C_PANEL, rar["color"] if lv > 0 else G.C_LINE, 6, 1, 7))
+	var h := HBoxContainer.new()
+	p.add_child(h)
+	var icon := G.label("◆", 26, rar["color"] if lv > 0 else Color(0.3, 0.3, 0.35))
+	icon.custom_minimum_size.x = 30
+	h.add_child(icon)
+	var v := VBoxContainer.new()
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.add_theme_constant_override("separation", 0)
+	h.add_child(v)
+	if lv == 0:
+		v.add_child(G.label("？？？（%s）" % rar["name"], 13, G.C_DIM))
+		v.add_child(G.label("未発見", 11, G.C_DIM))
+		return p
+	var mx := " / 最大%d" % int(r["max"]) if r.has("max") else ""
+	v.add_child(G.label("%s  Lv%d%s" % [r["name"], lv, mx], 13, rar["color"]))
+	var cost := G.relic_cost(k)
+	var eff := "%s %s" % [r["desc"], G.relic_value_text(k, lv)]
+	if cost >= 0:
+		eff += " → " + G.relic_value_text(k, lv + 1)
+	var d := G.label(eff, 11, G.C_DIM)
+	d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(d)
+	var b: Button
+	if cost < 0:
+		b = G.button("最大", func(): pass)
+		b.disabled = true
+	else:
+		b = G.button("強化 " + G.fmt(cost), func():
+			if G.relic_up(k):
+				G.save_game()
+				refresh(), G.C_GOLD)
+		b.disabled = G.S["shards"] < cost
+	b.custom_minimum_size.x = 110
+	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	h.add_child(b)
+	return p
+
 func _rebirth() -> void:
 	var g := G.rebirth_gain()
-	main.confirm("転生しますか？", "冥核 +%d を得て、ステージ1からやり直します。カード・強化・遺物・魂貨は失われます。" % g, func():
+	main.confirm("転生しますか？", "冥核 +%d を得て、ステージ1からやり直します。カード・玉座の強化・魂貨は失われます（遺物・欠片・パッシブスキルは残ります）。" % g, func():
 		G.S["core"] += g
 		G.S["rebirths"] += 1
 		G.fresh_run(G.S)

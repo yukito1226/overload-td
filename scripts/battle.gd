@@ -60,6 +60,9 @@ var speed := 1
 var legion_t := 0.0
 var cannon_t := 1.0
 var bolts: Array = []
+var _crit := false
+var shard_gain := 0.0
+var relic_found := ""
 var core_gain := 0
 
 var bg_tex: ImageTexture
@@ -76,7 +79,7 @@ func _ready() -> void:
 	mana = min(G.max_mana(), 60.0 * G.T("start"))
 	castle = {"x": CASTLE_X, "hp": float(G.castle_hp()), "max": float(G.castle_hp())}
 	ebase = {"x": EBASE_X, "hp": float(G.ebase_hp(stage)), "max": float(G.ebase_hp(stage))}
-	spell_max = 30.0 * pow(0.8, G.relic_n("bell")) * pow(0.85, G.T("chant"))
+	spell_max = 30.0 * pow(0.85, G.T("chant"))
 	legion_t = _legion_interval()
 	for id in G.S["deck"]:
 		cds[id] = 0.0
@@ -227,7 +230,8 @@ func _damage(u: Unit, dmg: float) -> void:
 		u.saved = true
 		u.hp = 1
 		nums.append({"x": u.x, "y": GROUND - u.h - 18, "v": "執念", "t": 0.9, "c": G.C_ACCENT})
-	nums.append({"x": u.x, "y": GROUND - u.h - 6, "v": str(roundi(dmg)), "t": 0.7, "c": Color("#ff8a8a") if u.side > 0 else Color("#ffe080")})
+	var ncol := Color("#ff8a8a") if u.side > 0 else (Color("#ffb020") if _crit else Color("#ffe080"))
+	nums.append({"x": u.x, "y": GROUND - u.h - 6, "v": G.fmt(dmg) + ("!" if _crit and u.side < 0 else ""), "t": 0.7, "c": ncol})
 	var kb_n: int = u.d.get("kb", 1)
 	var seg := int(floor((1.0 - max(0.0, u.hp) / u.mx) * kb_n))
 	if u.hp <= 0:
@@ -236,7 +240,7 @@ func _damage(u: Unit, dmg: float) -> void:
 			fx.append({"x": u.x, "y": GROUND - u.h / 2, "vx": randf_range(-60, 60), "vy": -randf() * 140, "t": 0.6, "c": G.C_ACCENT if u.side > 0 else Color("#e8e0c8")})
 		if u.side < 0:
 			kills += 1
-			mana = min(G.max_mana(), mana + 8 * G.relic_n("eater"))
+			mana = min(G.max_mana(), mana + G.relic_add("eater"))
 			soul_bonus += int(u.d.get("soul", 0))
 	elif seg > u.kb_done:
 		u.kb_done = seg
@@ -248,12 +252,16 @@ func _hit_base(side: int, dmg: float) -> void:
 		dmg *= pow(0.9, G.T("fortress"))
 	b["hp"] -= dmg
 	shake = 0.15
-	nums.append({"x": b["x"] + (-20 if side > 0 else 20), "y": GROUND - 160, "v": str(roundi(dmg)), "t": 0.7, "c": Color("#ffe080") if side > 0 else Color("#ff8a8a")})
+	nums.append({"x": b["x"] + (-20 if side > 0 else 20), "y": GROUND - 160, "v": G.fmt(dmg), "t": 0.7, "c": Color("#ffe080") if side > 0 else Color("#ff8a8a")})
 
 func _foes(u: Unit) -> Array:
 	return units.filter(func(o): return o.side != u.side and not o.dead)
 
 func _apply_hit(u: Unit, tx: float, dmg: float, aoe: float) -> void:
+	# 屍眼の水晶：会心で3倍
+	_crit = u.side > 0 and randf() < G.crit_rate()
+	if _crit:
+		dmg *= 3.0
 	var base_x := EBASE_X - 40 if u.side > 0 else CASTLE_X + 40
 	if aoe > 0:
 		for f in _foes(u):
@@ -304,7 +312,7 @@ func _step_unit(u: Unit, dt: float) -> void:
 				var tg: Unit = hurt[0]
 				var amt: float = d["heal"] * sc["atk"]
 				tg.hp = min(tg.mx, tg.hp + amt)
-				nums.append({"x": tg.x, "y": GROUND - tg.h - 6, "v": "+" + str(roundi(amt)), "t": 0.7, "c": Color("#8aff9a")})
+				nums.append({"x": tg.x, "y": GROUND - tg.h - 6, "v": "+" + G.fmt(amt), "t": 0.7, "c": Color("#8aff9a")})
 				u.atk_t = d["rate"]
 				u.anim = 0.25
 			return
@@ -376,7 +384,7 @@ func _pick_enemy() -> String:
 
 func _spawn_enemy(key: String) -> void:
 	var e: Dictionary = Data.ENEMIES[key]
-	_add_unit(-1, e, roundi(e["hp"] * sc["hp"]), roundi(e["atk"] * sc["atk"] * (1.0 - 0.07 * G.T("hex"))), e["spd"], EBASE_X - 30)
+	_add_unit(-1, e, floor(e["hp"] * sc["hp"]), floor(e["atk"] * sc["atk"] * (1.0 - 0.07 * G.T("hex"))), e["spd"], EBASE_X - 30)
 
 func _enemy_ai(dt: float) -> void:
 	spawn_t -= dt
@@ -403,7 +411,8 @@ func cast_spell() -> void:
 	if over or spell < spell_max:
 		return
 	spell = 0
-	var dmg := roundi(160.0 * pow(1.12, G.T("might")) * (1.0 + 0.3 * G.T("wrath")) * (1.0 + 0.2 * (G.S["max_stage"] - 1)))
+	_crit = false
+	var dmg: float = floor(160.0 * G.atk_mult() * G.relic_mul("bell") * (1.0 + 0.3 * G.T("wrath")) * (1.0 + 0.2 * (G.S["max_stage"] - 1)))
 	for f in units.filter(func(u): return u.side < 0 and not u.dead):
 		pillars.append({"x": f.x, "t": 0.6})
 		_damage(f, dmg)
@@ -437,7 +446,8 @@ func _passive_tick(dt: float) -> void:
 					tgt = u
 			if tgt:
 				cannon_t = 1.6
-				var dmg := 22.0 * cl * (1.0 + 0.25 * (stage - 1))
+				_crit = false
+				var dmg := 22.0 * cl * (1.0 + 0.25 * (stage - 1)) * G.relic_mul("shield")
 				_damage(tgt, dmg)
 				bolts.append({"a": Vector2(CASTLE_X, GROUND - 195), "b": Vector2(tgt.x, GROUND - tgt.h / 2), "t": 0.25})
 			else:
@@ -547,8 +557,8 @@ func _draw() -> void:
 		_px(0, 0, W, H, Color(0.69, 0.49, 1.0, flash))
 	draw_set_transform(Vector2.ZERO)
 	# HUD
-	_bar(16, 12, 220, castle["hp"] / castle["max"], G.C_ACCENT, "骨の玉座 %d/%d" % [max(0, ceil(castle["hp"])), castle["max"]])
-	_bar(W - 236, 12, 220, ebase["hp"] / ebase["max"], Color("#ffd060"), "白銀の砦 %d/%d" % [max(0, ceil(ebase["hp"])), ebase["max"]])
+	_bar(16, 12, 220, castle["hp"] / castle["max"], G.C_ACCENT, "骨の玉座 %s/%s" % [G.fmt(max(0.0, ceil(castle["hp"]))), G.fmt(castle["max"])])
+	_bar(W - 236, 12, 220, ebase["hp"] / ebase["max"], Color("#ffd060"), "白銀の砦 %s/%s" % [G.fmt(max(0.0, ceil(ebase["hp"]))), G.fmt(ebase["max"])])
 	var rem: float = max(0.0, TIME_LIMIT - t)
 	_text("%d:%02d" % [int(rem / 60), int(rem) % 60], Vector2(W / 2, 30), 20, G.C_RED if rem < 30 else G.C_TEXT)
 	_text("ステージ %d" % stage, Vector2(W / 2, 48), 12, G.C_DIM)
@@ -668,12 +678,20 @@ func end_battle(win: bool) -> void:
 	over = true
 	won = win
 	var S := G.S
-	var gain := int(floor(G.win_souls(stage) if win else G.win_souls(stage) * 0.35 * min(1.0, t / 60.0 + 0.3)))
-	gain += int(floor(soul_bonus * G.soul_mult()))
+	var gain: float = floor(G.win_souls(stage) if win else G.win_souls(stage) * 0.35 * min(1.0, t / 60.0 + 0.3))
+	gain += floor(soul_bonus * G.soul_mult())
 	S["souls"] += gain
+	# 遺物の欠片：勝てば満額、負けても戦った時間に応じて少し
+	shard_gain = G.shard_win(stage) if win else floor(G.shard_win(stage) * 0.3 * min(1.0, t / 60.0 + 0.3))
+	S["shards"] += shard_gain
 	var first: bool = win and stage == S["max_stage"]
 	core_gain = 2 if first and stage % 5 == 0 else 0
 	S["core"] += core_gain
+	# ボス初撃破で遺物を1つ確定入手
+	relic_found = ""
+	if first and stage % 5 == 0:
+		relic_found = G.roll_relic()
+		G.gain_relic(relic_found)
 	if win:
 		if first:
 			S["max_stage"] += 1
@@ -685,14 +703,14 @@ func end_battle(win: bool) -> void:
 	if win:
 		_show_reward(gain, int(t), first)
 	else:
-		var hint := "\nカードや玉座を強化して再挑戦しましょう。"
+		var hint := "\nカードや玉座、「遺物」タブで遺物を強化して再挑戦しましょう。"
 		if G.rebirth_gain() > 0:
-			hint = "\n行き詰まったら「転生」で冥核 +%d を得て、パッシブスキルを解放しましょう。" % G.rebirth_gain()
+			hint = "\n欠片で「遺物」を強化するか、「転生」で冥核 +%d を得てパッシブスキルを解放しましょう（遺物と欠片は転生しても残ります）。" % G.rebirth_gain()
 		elif G.S["core"] > 0:
 			hint = "\n冥核が %d あります。「パッシブスキル」タブで新しい力を解放しましょう。" % G.S["core"]
-		main.open_modal("敗北…", "戦闘時間 %d秒・撃破 %d\n獲得魂貨 +%s%s" % [int(t), kills, G.fmt(gain), hint], [["玉座へ戻る", main.back_to_hub]])
+		main.open_modal("敗北…", "戦闘時間 %d秒・撃破 %d\n獲得魂貨 +%s・遺物の欠片 +%s%s" % [int(t), kills, G.fmt(gain), G.fmt(shard_gain), hint], [["玉座へ戻る", main.back_to_hub]])
 
-func _show_reward(gain: int, time: int, first: bool) -> void:
+func _show_reward(gain: float, time: int, first: bool) -> void:
 	var S := G.S
 	var unowned := []
 	for k in Data.CARDS:
@@ -700,17 +718,16 @@ func _show_reward(gain: int, time: int, first: bool) -> void:
 			unowned.append(k)
 	var owned: Array = S["cards"].keys()
 	owned.shuffle()
-	var relic_keys: Array = Data.RELICS.keys()
 	var pool := []
 	if unowned.size() > 0:
 		unowned.sort_custom(func(a, b): return Data.CARDS[a]["cost"] < Data.CARDS[b]["cost"])
 		pool.append({"type": "card", "id": unowned[randi() % min(2, unowned.size())]})
 	pool.append({"type": "lv", "id": owned[0]})
-	pool.append({"type": "relic", "id": relic_keys.pick_random()})
+	pool.append({"type": "relic", "id": G.roll_relic()})
 	if owned.size() > 1:
 		pool.append({"type": "lv", "id": owned[1]})
-	pool.append({"type": "relic", "id": relic_keys.pick_random()})
-	pool.append({"type": "souls", "id": "", "v": int(gain * 0.8)})
+	pool.append({"type": "shards", "id": "", "v": floor(shard_win_bonus())})
+	pool.append({"type": "souls", "id": "", "v": floor(gain * 0.8)})
 	var n := 3 if first else 2
 	var opts := []
 	var seen := {}
@@ -745,7 +762,12 @@ func _show_reward(gain: int, time: int, first: bool) -> void:
 				tag = "カード強化"; title = "%s Lv%d→%d" % [c["name"], S["cards"][o["id"]], S["cards"][o["id"]] + 1]; desc = "無償でレベルアップ"; tex = Data.TEX[c["spr"]]["r"]
 			"relic":
 				var r: Dictionary = Data.RELICS[o["id"]]
-				tag = "遺物"; title = r["name"]; desc = "%s\n（転生まで有効・重複可）" % r["desc"]
+				var lv := G.rl(o["id"])
+				tag = "遺物（%s）" % Data.RARITY[r["rarity"]]["name"]
+				title = r["name"] + ("  発見！" if lv == 0 else "  Lv%d→%d" % [lv, lv + 1])
+				desc = "%s %s\n（永続・転生しても残る）" % [r["desc"], G.relic_value_text(o["id"], lv + 1)]
+			"shards":
+				tag = "遺物の欠片"; title = "+%s 欠片" % G.fmt(o["v"]); desc = "遺物の強化に使う"
 			_:
 				tag = "魂貨"; title = "+%s 魂貨" % G.fmt(o["v"]); desc = "追加の魂貨"
 		var lt := G.label(tag, 11, G.C_ACCENT)
@@ -754,7 +776,8 @@ func _show_reward(gain: int, time: int, first: bool) -> void:
 		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		tr.custom_minimum_size.y = 60
-		var big := G.label("" if tex else ("◆" if o["type"] == "relic" else "◎"), 34, G.C_GOLD)
+		var big_col: Color = Data.RARITY[Data.RELICS[o["id"]]["rarity"]]["color"] if o["type"] == "relic" else G.C_GOLD
+		var big := G.label("" if tex else ("◆" if o["type"] == "relic" else ("◇" if o["type"] == "shards" else "◎")), 34, big_col)
 		var lt2 := G.label(title, 14, G.C_TEXT)
 		var ld := G.label(desc, 11, G.C_DIM)
 		ld.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -764,7 +787,15 @@ func _show_reward(gain: int, time: int, first: bool) -> void:
 				c.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			v.add_child(c)
 		row.add_child(b)
-	main.open_modal("勝利！", "戦闘時間 %d秒・撃破 %d・獲得魂貨 +%s%s\n戦利品をひとつ選べ：" % [time, kills, G.fmt(gain), ("\n新たなステージが開放された。" if first else "") + ("\nボス初撃破！ 冥核 +%d（パッシブスキルの解放に使えます）" % core_gain if core_gain > 0 else "")], [], row)
+	var extra := ("\n新たなステージが開放された。" if first else "")
+	if core_gain > 0:
+		extra += "\nボス初撃破！ 冥核 +%d" % core_gain
+	if relic_found != "":
+		extra += "　遺物「%s」を手に入れた（Lv%d）" % [Data.RELICS[relic_found]["name"], G.rl(relic_found)]
+	main.open_modal("勝利！", "戦闘時間 %d秒・撃破 %d・獲得魂貨 +%s・遺物の欠片 +%s%s\n戦利品をひとつ選べ：" % [time, kills, G.fmt(gain), G.fmt(shard_gain), extra], [], row)
+
+func shard_win_bonus() -> float:
+	return max(5.0, shard_gain * 3.0)
 
 func _take_reward(o: Dictionary) -> void:
 	var S := G.S
@@ -776,7 +807,9 @@ func _take_reward(o: Dictionary) -> void:
 		"lv":
 			S["cards"][o["id"]] += 1
 		"relic":
-			S["relics"].append(o["id"])
+			G.gain_relic(o["id"])
+		"shards":
+			S["shards"] += o["v"]
 		_:
 			S["souls"] += o["v"]
 	G.save_game()
