@@ -24,8 +24,13 @@ func _ready() -> void:
 	v.add_child(G.label("デバッグ", 15, Color("#ffd060")))
 
 	var g := _section(v, "― 資源・進行 ―")
-	_btn(g, "魂貨 +10000", func(): G.S["souls"] += 10000)
+	_btn(g, "魂貨 ×100（+1万）", func(): G.S["souls"] = max(10000.0, G.S["souls"] * 100.0))
 	_btn(g, "冥核 +50", func(): G.S["core"] += 50)
+	_btn(g, "欠片 ×100（+1000）", func(): G.S["shards"] = max(1000.0, G.S["shards"] * 100.0))
+	_btn(g, "全遺物を発見", func():
+		for k in Data.RELICS:
+			if G.rl(k) == 0:
+				G.S["relic_lv"][k] = 1)
 	_btn(g, "全カード入手", _all_cards)
 	_btn(g, "全カード Lv+5", func():
 		for k in G.S["cards"]:

@@ -286,15 +286,30 @@ var ENEMIES := {
 	"seraph":  {"name": "熾天使",   "spr": "seraph",  "hp": 2200, "atk": 70, "range": 70,  "spd": 16, "rate": 2.4, "kb": 6, "aoe": 40, "proj": Color("#fff0a0"), "soul": 120, "boss": true, "fly": true},
 }
 
+# 遺物：一度見つけたら転生しても残る永続コレクション。
+# 「遺物の欠片」でLvを上げる。kind="mul" は効果が (1+v)^Lv で掛け算的に伸びる（インフレの軸）、
+# kind="add" は v×Lv の足し算（上限 max あり）。
+# rarity: 0=普通 1=希少 2=伝説（発見しやすさと強化コストが違う）
+var RARITY := [
+	{"name": "普通", "color": Color("#c8c0d8"), "weight": 60.0, "cost": 4.0},
+	{"name": "希少", "color": Color("#6ad0ff"), "weight": 30.0, "cost": 12.0},
+	{"name": "伝説", "color": Color("#e0b040"), "weight": 10.0, "cost": 40.0},
+]
 var RELICS := {
-	"crown":  {"name": "呪われた冠",   "desc": "全ユニット攻撃力 +15%"},
-	"grail":  {"name": "黒血の聖杯",   "desc": "魂力の回復速度 +15%"},
-	"bell":   {"name": "葬送の鐘",     "desc": "冥王の裁きのチャージ時間 -20%"},
-	"shield": {"name": "骨の大盾",     "desc": "玉座の耐久 +25%"},
-	"march":  {"name": "亡者の行進曲", "desc": "ユニット移動速度 +12%"},
-	"eater":  {"name": "魂喰らい",     "desc": "敵撃破で魂力 +8"},
-	"hide":   {"name": "死皮の外套",   "desc": "全ユニット体力 +15%"},
-	"hourg":  {"name": "黒砂の時計",   "desc": "召喚クールダウン -12%"},
+	"crown":  {"name": "呪われた冠",     "rarity": 0, "kind": "mul", "v": 0.20, "desc": "全ユニットの攻撃力"},
+	"hide":   {"name": "死皮の外套",     "rarity": 0, "kind": "mul", "v": 0.20, "desc": "全ユニットの体力"},
+	"purse":  {"name": "墓守の財布",     "rarity": 0, "kind": "mul", "v": 0.15, "desc": "獲得魂貨"},
+	"shield": {"name": "骨の大盾",       "rarity": 0, "kind": "mul", "v": 0.25, "desc": "玉座の耐久"},
+	"bell":   {"name": "葬送の鐘",       "rarity": 0, "kind": "mul", "v": 0.30, "desc": "冥王の裁きの威力"},
+	"grail":  {"name": "黒血の聖杯",     "rarity": 1, "kind": "add", "v": 0.06, "max": 25, "desc": "魂力の回復速度"},
+	"march":  {"name": "亡者の行進曲",   "rarity": 1, "kind": "add", "v": 0.04, "max": 15, "desc": "ユニットの移動速度"},
+	"hourg":  {"name": "黒砂の時計",     "rarity": 1, "kind": "add", "v": 0.03, "max": 15, "desc": "召喚クールダウン短縮"},
+	"lens":   {"name": "屍眼の水晶",     "rarity": 1, "kind": "add", "v": 0.02, "max": 20, "desc": "会心率（会心で3倍ダメージ）"},
+	"fang":   {"name": "血牙の首飾り",   "rarity": 1, "kind": "mul", "v": 0.15, "desc": "遺物の欠片の獲得量"},
+	"eater":  {"name": "魂喰らい",       "rarity": 1, "kind": "add", "v": 3.0,  "max": 20, "flat": true, "desc": "敵撃破時に得る魂力"},
+	"heart":  {"name": "冥王の心臓",     "rarity": 2, "kind": "mul", "v": 0.40, "desc": "全ユニットの攻撃力と体力"},
+	"tome":   {"name": "禁書「終末の頁」", "rarity": 2, "kind": "add", "v": 0.25, "max": 40, "desc": "転生で得る冥核"},
+	"chain":  {"name": "共鳴の鎖",       "rarity": 2, "kind": "mul", "v": 0.01, "desc": "所持遺物1種ごとに全ユニットの攻撃力（×所持数）"},
 }
 
 var UPS := {
